@@ -12,6 +12,9 @@ the build of in-house customer analytics gathering. These custom metrics are
 then send to the stats-service. It stores them in InfluxDB and Grafana is used
 to write in-house rules for graphing.
 
+See https://github.com/oisinmulvihill/stats-service for documentation.
+
+
 Development
 -----------
 
