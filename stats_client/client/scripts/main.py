@@ -4,12 +4,13 @@ Oisin Mulvihill
 2015-11-06
 
 """
+import sys
 import json
 import logging
 from optparse import OptionParser
 
 
-from stats.analytics import Analytics
+from stats_client.client.analytics import Analytics
 
 
 def get_log(e=None):
@@ -52,6 +53,18 @@ def main():
     )
 
     parser.add_option(
+        "--ping", action="store_true", dest="ping_check",
+        default=False,
+        help="Test the connection to the server by accessing /ping"
+    )
+
+    parser.add_option(
+        "--get", action="store", dest="entry_id",
+        default=None,
+        help="Recover a specific event based on its ID."
+    )
+
+    parser.add_option(
         "--access_token", action="store", dest="access_token",
         default=None,
         help="The API access_token needed to talk to the stats-service."
@@ -65,27 +78,59 @@ def main():
 
     (options, args) = parser.parse_args()
 
-    log = logging.getLogger()
+    log = get_log('main')
 
     logtoconsolefallback(log)
 
-    if options.access_token is None:
-        raise SystemExit("Please specify the --access_token to use.")
+    if options.ping_check is False:
+        if options.access_token is None:
+            raise SystemExit("Please specify the --access_token to use.")
 
-    Analytics.init(dict(
-        url=options.url,
-        access_token=options.access_token
-    ))
+        stats = Analytics.init(dict(
+            url=options.url,
+            defer=False,
+            access_token=options.access_token
+        ))
 
-    log.debug("uid: '{}'".format(options.uid))
+    else:
+        stats = Analytics.init(dict(
+            url=options.url, defer=False, access_token="no-needed"
+        ))
 
-    log.debug("json loads of: '{}'".format(options.data))
-    data = json.loads(options.data)
+    if options.ping_check is True:
+        log.debug("uid: '{}'".format(options.uid))
+        try:
+            resp = stats.ping()
 
-    log.debug("event: '{}'".format(options.event))
+        except Exception:
+            log.exception("failed to ping check the server!")
+            sys.exit(1)
 
-    Analytics.log(
-        uid=options.uid,
-        event=options.event,
-        data=data,
-    )
+        else:
+            log.info("ping check OK: {}".format(resp))
+
+    else:
+        if options.entry_id is not None:
+            log.debug("Attempting to recover event id '{}' data".format(
+                options.entry_id
+            ))
+            result = stats.get(options.entry_id)
+            log.info("{}".format(result))
+
+        else:
+            log.debug("uid: '{}'".format(options.uid))
+
+            log.debug("json loads of: '{}'".format(options.data))
+            data = json.loads(options.data)
+
+            if 'uid' not in data:
+                data['uid'] = options.uid
+
+            if 'event' not in data:
+                data['event'] = options.event
+
+            log.debug("event: '{}'".format(options.event))
+            result = stats.log(data=data)
+            log.info("event_id {}".format(result))
+
+    sys.exit(0)

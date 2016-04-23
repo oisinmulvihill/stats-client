@@ -9,22 +9,33 @@ import threading
 from urlparse import urljoin
 
 import requests
-from pp.apiaccesstoken.restclientside import RequestsAccessTokenAuth
+from apiaccesstoken.clientside import RequestsAccessTokenAuth
 
-from stats.client.dflatten import flatten
+from stats_client.client.dflatten import flatten
 
 
 def get_log(e=None):
     return logging.getLogger("{0}.{1}".format(__name__, e) if e else __name__)
 
 
+# Set up by a call to Analytics.init(...):
+__Analytics = None
+
+
 class Analytics(object):
-    """A light namespace for the REST API to stats.service.
+    """A light namespace for the REST API to stats-service.
     """
 
-    JSON_CT = {'Content-Type': 'application/json'}
+    JSON_CT = {
+        # I accept JSON:
+        'Accept': 'application/json',
+        # I POST JSON:
+        'Content-Type': 'application/json',
+    }
 
     ANALYTICS = '/log/event/'
+
+    EVENT = '/log/event/{}/'
 
     def __init__(self, config={}):
         """Set up the analytics REST API service details.
@@ -52,7 +63,10 @@ class Analytics(object):
         """
         log = get_log("Analytics.init")
         self.disabled = config.get("disabled", False)
-        self.base_uri = config.get("uri", "http://localhost:20080")
+        self.base_uri = config.get("url", "http://localhost:20080")
+        log.debug(
+            "Logging events to stats-service '{}'.".format(self.base_uri)
+        )
         self.defer = config.get("defer", True)
         self.app_node = socket.gethostname()
         # once-off log analytics is disable in a call to self.log()
@@ -63,7 +77,35 @@ class Analytics(object):
         else:
             log.debug("access token set.")
         self.auth = RequestsAccessTokenAuth(access_token)
-        log.debug("REST Service base URI: {}".format(self.base_uri))
+
+    @classmethod
+    def init(cls, config={}):
+        """Set up the Analytics instance for stats() to return.
+
+        :param config: The URI of the analytics service.
+
+        If no 'uri' field is set or is empty the analytics logging will be
+        disabled after logging a single warning. This allows analytics to be
+        turned off with causing errors.
+
+        """
+        global __Analytics
+        __Analytics = Analytics(
+            dict(
+                # Disable event logging if the uri is empty:
+                disabled=config.get("disabled"),
+                access_token=config.get("access_token"),
+                url=config.get("url"),
+                defer=config.get("defer", True),
+            )
+        )
+        return __Analytics
+
+    @classmethod
+    def stats(cls):
+        """Return the configured Analytics instance set up by init()."""
+        assert __Analytics is not None
+        return __Analytics
 
     def get_auth(self):
         """Recover the configured access auth instance."""
@@ -172,33 +214,25 @@ class Analytics(object):
         else:
             return _go(self.defer, uri, data)
 
+    def get(self, event_id):
+        """Recover a specific event by its ID from the Stats Service.
 
-__Analytics = None
+        :param event_id: The InfluxDB unique identifer.
 
+        :returns: the event data if found.
 
-def init(config={}):
-    """Set up the Analytics instance for stats() to return.
+        """
+        log = get_log('get')
 
-    :param config: The URI of the analytics service.
+        uri = urljoin(self.base_uri, self.EVENT.format(event_id))
+        log.debug("contacting '{}'".format(uri))
 
-    If no 'uri' field is set or is empty the analytics logging will be disabled
-    after logging a single warning. This allows analytics to be turned off with
-    causing errors.
-
-    """
-    global __Analytics
-    __Analytics = Analytics(
-        dict(
-            # Disable event logging if the uri is empty:
-            disabled=config.get("disabled"),
-            access_token=config.get("access_token"),
-            uri=config.get("uri"),
-            defer=config.get("defer", True),
+        resp = requests.get(
+            uri,
+            headers=self.JSON_CT,
+            auth=self.get_auth(),
         )
-    )
 
+        resp.raise_for_status()
 
-def stats():
-    """Return the configured Analytics instance set up by init()."""
-    assert __Analytics
-    return __Analytics
+        return resp.json()

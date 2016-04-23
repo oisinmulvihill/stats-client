@@ -38,8 +38,12 @@ PackageData = {
     '': ['*.*'],
 }
 
-EntryPoints = """
-"""
+EntryPoints = {
+    'console_scripts': [
+        'stats-client = stats_client.client.scripts.main:main',
+    ],
+}
+
 
 import sys
 from setuptools.command.test import test as TestCommand
