@@ -51,7 +51,7 @@ class Analytics(object):
                 "access_token": "<access token string>",
 
                 # The analytics service to connect to:
-                "uri": "http://localhost:20080",
+                "url": "http://localhost:20080",
 
                 # Log asynchronusly and don't wait for a response.
                 "defer": True,
@@ -144,7 +144,7 @@ class Analytics(object):
         log = get_log("Analytics.system_startup")
 
         data = dict(
-            event='pnc.server.start',
+            event='server.start',
             uid="system-{}".format(self.app_node),
             ip=socket.gethostbyname(self.app_node),
             app_node=self.app_node,
