@@ -55,7 +55,15 @@ class Analytics(object):
 
                 # Log asynchronusly and don't wait for a response.
                 "defer": True,
+
+                # optional dict which become "tags" in logged events. If not
+                # set "tags" field won't be present in logged events.
+                "tags": A dict of key-value pairs to include in a event log.
             }
+
+        tags example::
+
+            {"mode": "prodution" | "development"}
 
         If defer is True return letting a thread handle the POST. The
         raise_for_status() will be logged and not raised.
@@ -64,6 +72,7 @@ class Analytics(object):
         log = get_log("Analytics.init")
         self.disabled = config.get("disabled", False)
         self.base_uri = config.get("url", "http://localhost:20080")
+        self.tags = config.get("tags", None)
         log.debug(
             "Logging events to stats-service '{}'.".format(self.base_uri)
         )
@@ -176,8 +185,11 @@ class Analytics(object):
         if 'datetime' not in data:
             data['datetime'] = self.now().isoformat()
 
+        if self.tags is not None:
+            data['tags'] = self.tags
+
         data = flatten(data)
-        #print("AFTER FLATTEN data:{}".format(json.dumps(data, indent=4)))
+        #log.debug("AFTER FLATTEN data:{}".format(json.dumps(data, indent=4)))
 
         uri = urljoin(self.base_uri, self.ANALYTICS)
 
