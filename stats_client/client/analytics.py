@@ -200,23 +200,28 @@ class Analytics(object):
 
         def _go(defer, uri, data):
             log.debug("sending data '{}' to '{}'".format(data, uri))
-            resp = requests.post(
-                uri,
-                data=data,
-                headers=self.JSON_CT,
-                auth=self.get_auth()
-            )
+            returned = ""
             try:
-                resp.raise_for_status()
-
-            except:
-                log.exception(
-                    "Error sending data '{}' to '{}': ".format(data, uri)
+                resp = requests.post(
+                    uri,
+                    data=data,
+                    headers=self.JSON_CT,
+                    auth=self.get_auth()
                 )
-                if not defer:
-                    raise
 
-            return resp.json()
+            except requests.exceptions.ConnectionError, e:
+                log.warn("Uable to connect to log event: {}".format(e))
+
+            else:
+                if resp.status_code > 399:
+                    log.error("Log event error: {} {}".format(
+                        resp.status_code, resp
+                    ))
+
+                else:
+                    returned = resp.json()
+
+            return returned
 
         if self.defer:
             t = threading.Thread(target=_go, args=(self.defer, uri, data))
