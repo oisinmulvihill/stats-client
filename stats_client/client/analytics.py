@@ -4,7 +4,6 @@
 import json
 import socket
 import logging
-import datetime
 import threading
 from urlparse import urljoin
 
@@ -122,10 +121,6 @@ class Analytics(object):
             )
         return self.auth
 
-    def now(self):
-        """Returns the current UTC date and time."""
-        return datetime.datetime.utcnow()
-
     def ping(self):
         """Recover the API Service status page.
 
@@ -154,7 +149,9 @@ class Analytics(object):
                 hostname=self.app_node,
             ),
             fields=dict(
-                value=self.now()
+                # will allow you to count() the number of startups.
+                # lots/<time period e.g. min,day,etc> is probably bad :)
+                value=1
             )
         )]
         self.log(points)
