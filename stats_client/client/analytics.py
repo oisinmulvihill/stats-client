@@ -11,8 +11,6 @@ from urlparse import urljoin
 import requests
 from apiaccesstoken.clientside import RequestsAccessTokenAuth
 
-from stats_client.client.dflatten import flatten
-
 
 def get_log(e=None):
     return logging.getLogger("{0}.{1}".format(__name__, e) if e else __name__)
@@ -140,9 +138,7 @@ class Analytics(object):
 
         uri = urljoin(self.base_uri, 'ping/')
         log.debug("contacting '{}'".format(uri))
-
         resp = requests.get(uri, headers=self.JSON_CT)
-
         resp.raise_for_status()
 
         return resp.json()
@@ -150,28 +146,23 @@ class Analytics(object):
     def system_startup(self):
         """Log the start of a service on a machine.
         """
-        log = get_log("Analytics.system_startup")
+        points = [dict(
+            measurement='server_startup',
+            tags=dict(
+                uid="system-{}".format(self.app_node),
+                ip=socket.gethostbyname(self.app_node),
+                hostname=self.app_node,
+            ),
+            fields=dict(
+                value=self.now()
+            )
+        )]
+        self.log(points)
 
-        data = dict(
-            event='server.start',
-            uid="system-{}".format(self.app_node),
-            ip=socket.gethostbyname(self.app_node),
-            app_node=self.app_node,
-        )
-
-        log.debug("data:{}".format(data))
-        self.log(data)
-
-    def log(self, data={}):
+    def log(self, points):
         """Log an analytics event string with the given data.
 
-        :param data: A dict which can be converted to JSON and sent.
-
-        At a minimum it will need to contain the uid and event fields.
-
-            uid: A unique id used to tie together analytic events.
-
-            event: A string naming the event e.g. 'pnc.user.login'
+        :param points: InfluxDB points.
 
         """
         log = get_log("Analytics.log")
@@ -182,21 +173,8 @@ class Analytics(object):
                 self._logdisabled = True
             return
 
-        if 'datetime' not in data:
-            data['datetime'] = self.now().isoformat()
-
-        if self.tags is not None:
-            data['tags'] = self.tags
-
-        data = flatten(data)
-        #log.debug("AFTER FLATTEN data:{}".format(json.dumps(data, indent=4)))
-
         uri = urljoin(self.base_uri, self.ANALYTICS)
-
-        assert 'uid' in data
-        assert 'event' in data
-
-        data = json.dumps(data)
+        points = json.dumps(points)
 
         def _go(defer, uri, data):
             log.debug("sending data '{}' to '{}'".format(data, uri))
@@ -224,32 +202,9 @@ class Analytics(object):
             return returned
 
         if self.defer:
-            t = threading.Thread(target=_go, args=(self.defer, uri, data))
+            t = threading.Thread(target=_go, args=(self.defer, uri, points))
             t.daemon = True
             t.start()
 
         else:
-            return _go(self.defer, uri, data)
-
-    def get(self, event_id):
-        """Recover a specific event by its ID from the Stats Service.
-
-        :param event_id: The InfluxDB unique identifer.
-
-        :returns: the event data if found.
-
-        """
-        log = get_log('get')
-
-        uri = urljoin(self.base_uri, self.EVENT.format(event_id))
-        log.debug("contacting '{}'".format(uri))
-
-        resp = requests.get(
-            uri,
-            headers=self.JSON_CT,
-            auth=self.get_auth(),
-        )
-
-        resp.raise_for_status()
-
-        return resp.json()
+            return _go(self.defer, uri, points)
