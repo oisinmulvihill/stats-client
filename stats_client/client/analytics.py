@@ -174,7 +174,7 @@ class Analytics(object):
         points = json.dumps(points)
 
         def _go(defer, uri, data):
-            log.debug("sending data '{}' to '{}'".format(data, uri))
+            #log.debug("sending data '{}' to '{}'".format(data, uri))
             returned = ""
             try:
                 resp = requests.post(

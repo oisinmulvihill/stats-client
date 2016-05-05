@@ -73,9 +73,9 @@ def agent(request):
     for field in AGENT_FIELDS:
         agent_dict[field.lower()] = data_from.get(field, '')
 
-    if "http_user_agent" in agent_dict:
-        agent_dict['ua'] = ua_string_dict(
-            agent_dict["http_user_agent"]
-        )
+    # if "http_user_agent" in agent_dict:
+    #     agent_dict['ua'] = ua_string_dict(
+    #         agent_dict["http_user_agent"]
+    #     )
 
     return agent_dict
