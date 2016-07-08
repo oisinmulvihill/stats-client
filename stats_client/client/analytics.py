@@ -69,7 +69,7 @@ class Analytics(object):
         log = get_log("Analytics.init")
         self.disabled = config.get("disabled", False)
         self.base_uri = config.get("url", "http://localhost:20080")
-        self.tags = config.get("tags", None)
+        self.tags = config.get("tags", {})
         log.debug(
             "Logging events to stats-service '{}'.".format(self.base_uri)
         )
@@ -141,13 +141,18 @@ class Analytics(object):
     def system_startup(self):
         """Log the start of a service on a machine.
         """
+        tags = dict(
+            uid="system-{}".format(self.app_node),
+            ip=socket.gethostbyname(self.app_node),
+            hostname=self.app_node,
+        )
+        # add in extra tags if they have been specified
+        for key in self.tags:
+            tags[key] = unicode(self.tags[key])
+
         points = [dict(
             measurement='server_startup',
-            tags=dict(
-                uid="system-{}".format(self.app_node),
-                ip=socket.gethostbyname(self.app_node),
-                hostname=self.app_node,
-            ),
+            tags=tags,
             fields=dict(
                 # will allow you to count() the number of startups.
                 # lots/<time period e.g. min,day,etc> is probably bad :)
